@@ -1,0 +1,86 @@
+org: casabona
+app: commercial-paper-importer
+service: commercial-paper-importer
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: java21
+  lambdaHashingVersion: 20201221
+  environment:
+    ISSUANCE_TABLE_NAME: cpi-issuance-data1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - secretsmanager:GetSecretValue
+      Resource: "arn:aws:secretsmanager:us-east-1:061774114609:secret:sandbox/laqus/api-1MQnAQ"
+    - Effect: Allow
+      Action:
+        - sns:Publish
+      Resource: "arn:aws:sns:${aws:region}:${aws:accountId}:topico-teste"
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:Scan
+        - s3:GetObject
+        - s3:DeleteObject
+        - sns:Publish
+      Resource: "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/cpi-issuance-data1"
+
+package:
+  artifact: target/commercialpaperimporter-0.0.1.jar
+
+functions:
+  emission:
+    handler: br.com.celcoin.commercialpaperimporter.emission.framework.input.sqs.EmissionHandler
+    timeout: 300
+    events:
+      - sqs: arn:aws:sqs:us-east-1:061774114609:testefila2
+    Action:
+      - secretsmanager:GetSecretValue
+    Resource: "arn:aws:secretsmanager:us-east-1:061774114609:secret:sandbox/laqus/api-1MQnAQ"
+
+  submission:
+    handler: br.com.celcoin.commercialpaperimporter.emission.framework.input.shcedule.SubmissionHandler
+    timeout: 300
+    events:
+      - schedule: rate(1 minute)
+#      - schedule: rate(50 minute)
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - sns:Publish
+        Resource: "*"
+
+#  emissionProcess:
+#    handler: br.com.celcoin.commercialpaperimporter.emission.framework.input.sqs.EmissionHandler
+#    events:
+#      - schedule: rate(1 minute)
+
+resources:
+  Resources:
+    CPIIssuanceData:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: cpi-issuance-data1
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+          - AttributeName: ESCRITURATOR_CNPJ
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+          - AttributeName: ESCRITURATOR_CNPJ
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        SSESpecification:
+          SSEEnabled: true

@@ -1,0 +1,87 @@
+@startuml
+
+title integration (v1.0.0 - 2024-03-01)
+
+participant ":CELCOIN" as celc
+participant ":sqs" as sqs
+participant ":sns" as sns
+participant ":LAQUS" as laqus
+participant "commercial-paper-importer" as cpi
+participant "EMISSAO" as emissao
+participant "Soliciar_Emissao" as semissao
+participant "Consultar_Emissao" as cemissao
+participant "Adicionar_Dados_Financeiros" as adfinanceiros
+participant "Enviar_Documentos" as edoc
+participant "Submeter_Emissao" as semi
+participant "Consultar_Quantidade_Emissoes_de_um_Emissor" as cone
+participant "Consultar_Solicitacao_Emissao" as cse
+participant "CADASTRO" as cadastro
+participant "Cadastrar_Emissor" as casemi
+participant "Cadastrar_Representante_Legal" as cadrl
+participant "Submeter_Solicitação_de_cadastro_aprovação" as sscad
+participant "Dynamo" as dyna
+
+group EMISSAO NOTA COMERCIAL
+
+    sqs -> cpi :
+    cpi -> dyna : createOrGet
+    dyna --> cpi :
+    cpi -> cone : POST /api/v1/solicitacoes/:cnpj
+    cone --> cpi :
+    cpi -> adfinanceiros : POST /api/v1/solicitacoes/{{solicitacaoId}}/dados-financeiros
+    adfinanceiros --> cpi :
+    cpi -> edoc : POST /api/v1/solicitacoes/:id/documentos
+    edoc --> cpi :
+    cpi -> cse : GET /api/v1/solicitacoes/:id
+    cse --> cpi :
+
+    alt investidor Aprovado e emissor Aprovado
+
+        cpi -> semi : POST /api/v1/solicitacoes/:id/submissao
+        semi --> cpi :
+        cpi -> dyna : update
+        dyna --> cpi :
+        cpi --> sns
+
+    else investidor Aprovado e emissor EmAnalise
+
+        cpi -> casemi : POST /api/v1/cadastros
+        casemi --> cpi :
+        cpi -> cadrl : POST /api/v1/cadastros/:cadastroId/representantes-legais
+        cadrl --> cpi :
+        cpi -> sscad : POST /api/v1/cadastros/:cadastroId
+        sscad --> cpi :
+        cpi -> dyna : update status EmissorCadastrado
+
+    end
+
+        cpi -> sns : caso ocorra algum erro de negócio
+        cpi -> sqs : Retry: caso ocorra algum erro de infra
+
+end
+
+group SHEDULE
+
+    cpi -> cpi : SCHEDULE
+    cpi -> dyna : list status EmissorCadastrado
+    dyna --> cpi :
+    cpi -> cse : GET /api/v1/solicitacoes/:id
+    cse --> cpi :
+
+    alt Aprovado
+
+        cpi -> dyna : saveStatus:Aguardando Liquidação
+        dyna --> cpi :
+        cpi -> sns : adiciona na fila para processamento
+        sns --> cpi
+
+    else EmAnalise
+
+        cpi -> dyna : atualiza hora
+        dyna --> cpi :
+
+    end
+
+end
+
+@enduml

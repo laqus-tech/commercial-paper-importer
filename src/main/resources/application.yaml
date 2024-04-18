@@ -1,0 +1,10 @@
+amazon:
+  dynamodb:
+    endpoint: dynamodb.sa-east-1.amazonaws.com
+  aws:
+#    accesskey: ${AWS-ACCESS-KEY-ID:EMPTY}
+#    secretkey: ${AWS-SECRET-ACCESS-KEY:EMPTY}
+#    sessiontoken: ${AWS-SESSION-TOKEN:EMPTY}
+    accesskey: ${AWS-ACCESS-KEY-ID:EMPTY}
+    secretkey: ${AWS-SECRET-ACCESS-KEY:EMPTY}
+    sessiontoken: ${AWS-SESSION-TOKEN:EMPTY}
